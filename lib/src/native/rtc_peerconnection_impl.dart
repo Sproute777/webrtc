@@ -118,7 +118,12 @@ class RTCPeerConnectionNative extends RTCPeerConnection {
         Map<dynamic, dynamic> track = map['track'];
 
         var newTrack = MediaStreamTrackNative(
-            track['id'], track['label'], track['kind'], track['enabled']);
+            track['id'],
+            track['label'],
+            track['kind'],
+            track['enabled'],
+            _peerConnectionId,
+            track['settings'] ?? {});
         String kind = track['kind'];
 
         var stream =
@@ -177,7 +182,8 @@ class RTCPeerConnectionNative extends RTCPeerConnection {
             receiver: RTCRtpReceiverNative.fromMap(map['receiver'],
                 peerConnectionId: _peerConnectionId),
             streams: streams,
-            track: MediaStreamTrackNative.fromMap(map['track']),
+            track:
+                MediaStreamTrackNative.fromMap(map['track'], _peerConnectionId),
             transceiver: transceiver));
         break;
 
@@ -360,10 +366,14 @@ class RTCPeerConnectionNative extends RTCPeerConnection {
 
   @override
   Future<void> addCandidate(RTCIceCandidate candidate) async {
-    await WebRTC.invokeMethod('addCandidate', <String, dynamic>{
-      'peerConnectionId': _peerConnectionId,
-      'candidate': candidate.toMap(),
-    });
+    try {
+      await WebRTC.invokeMethod('addCandidate', <String, dynamic>{
+        'peerConnectionId': _peerConnectionId,
+        'candidate': candidate.toMap(),
+      });
+    } on PlatformException catch (e) {
+      throw 'Unable to RTCPeerConnection::addCandidate: ${e.message}';
+    }
   }
 
   @override
