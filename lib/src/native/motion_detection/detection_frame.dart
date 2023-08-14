@@ -4,7 +4,7 @@ class DetectionFrame extends Equatable {
   const DetectionFrame(
       this.detectionList, this.aspectRatio, this.xCount, this.yCount);
 
-  factory DetectionFrame.fromMap(dynamic event) {
+  factory DetectionFrame.fromMap(event) {
     final map = Map<String, dynamic>.from(event as Map);
     final List<dynamic> detected = map['detected'];
     final double aspectRatio = map['aspect'];
