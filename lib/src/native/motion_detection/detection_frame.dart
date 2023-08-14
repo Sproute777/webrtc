@@ -6,7 +6,7 @@ class DetectionFrame extends Equatable {
 
   factory DetectionFrame.fromMap(event) {
     final map = Map<String, dynamic>.from(event as Map);
-    final List<dynamic> detected = map['detected'];
+    final List<String> detected = map['detected'];
     final double aspectRatio = map['aspect'];
     final int xCount = map['xCount'];
     final int yCount = map['yCount'];
@@ -28,8 +28,8 @@ class DetectionFrame extends Equatable {
 class Square extends Equatable {
   Square(this.x, this.y);
 
-  factory Square.fromString(dynamic string) {
-    final list = (string as String).split(':');
+  factory Square.fromString(String string) {
+    final list = string.split(':');
     if (list.length != 2) {
       throw Exception('Wrong square parse: $string');
     }
