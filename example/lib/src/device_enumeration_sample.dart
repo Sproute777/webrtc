@@ -132,17 +132,18 @@ class _DeviceEnumerationSampleState extends State<DeviceEnumerationSample> {
   }
 
   Future<void> loadDevices() async {
-    //Ask for runtime permissions if necessary.
-    var status = await Permission.bluetooth.request();
-    if (status.isPermanentlyDenied) {
-      print('BLEpermdisabled');
-    }
+    if (WebRTC.platformIsAndroid || WebRTC.platformIsIOS) {
+      //Ask for runtime permissions if necessary.
+      var status = await Permission.bluetooth.request();
+      if (status.isPermanentlyDenied) {
+        print('BLEpermdisabled');
+      }
 
-    status = await Permission.bluetoothConnect.request();
-    if (status.isPermanentlyDenied) {
-      print('ConnectPermdisabled');
+      status = await Permission.bluetoothConnect.request();
+      if (status.isPermanentlyDenied) {
+        print('ConnectPermdisabled');
+      }
     }
-
     final devices = await navigator.mediaDevices.enumerateDevices();
     setState(() {
       _devices = devices;
@@ -198,6 +199,14 @@ class _DeviceEnumerationSampleState extends State<DeviceEnumerationSample> {
       return;
     }
     await _localRenderer.audioOutput(deviceId!);
+  }
+
+  var _speakerphoneOn = false;
+
+  Future<void> _setSpeakerphoneOn() async {
+    _speakerphoneOn = !_speakerphoneOn;
+    await Helper.setSpeakerphoneOn(_speakerphoneOn);
+    setState(() {});
   }
 
   Future<void> _selectVideoInput(String? deviceId) async {
@@ -294,6 +303,8 @@ class _DeviceEnumerationSampleState extends State<DeviceEnumerationSample> {
       senders.clear();
       _inCalling = false;
       await stopPCs();
+      _speakerphoneOn = false;
+      await Helper.setSpeakerphoneOn(_speakerphoneOn);
       setState(() {});
     } catch (e) {
       print(e.toString());
@@ -320,20 +331,29 @@ class _DeviceEnumerationSampleState extends State<DeviceEnumerationSample> {
               }).toList();
             },
           ),
-          PopupMenuButton<String>(
-            onSelected: _selectAudioOutput,
-            icon: Icon(Icons.volume_down_alt),
-            itemBuilder: (BuildContext context) {
-              return _devices
-                  .where((device) => device.kind == 'audiooutput')
-                  .map((device) {
-                return PopupMenuItem<String>(
-                  value: device.deviceId,
-                  child: Text(device.label),
-                );
-              }).toList();
-            },
-          ),
+          if (!WebRTC.platformIsMobile)
+            PopupMenuButton<String>(
+              onSelected: _selectAudioOutput,
+              icon: Icon(Icons.volume_down_alt),
+              itemBuilder: (BuildContext context) {
+                return _devices
+                    .where((device) => device.kind == 'audiooutput')
+                    .map((device) {
+                  return PopupMenuItem<String>(
+                    value: device.deviceId,
+                    child: Text(device.label),
+                  );
+                }).toList();
+              },
+            ),
+          if (!kIsWeb && WebRTC.platformIsMobile)
+            IconButton(
+              disabledColor: Colors.grey,
+              onPressed: _setSpeakerphoneOn,
+              icon: Icon(
+                  _speakerphoneOn ? Icons.speaker_phone : Icons.phone_android),
+              tooltip: 'Switch SpeakerPhone',
+            ),
           PopupMenuButton<String>(
             onSelected: _selectVideoInput,
             icon: Icon(Icons.switch_camera),

@@ -138,15 +138,6 @@ NSArray<RTC_OBJC_TYPE(RTCVideoCodecInfo) *>* motifyH264ProfileLevelId(
     self.viewController = viewController;
 #endif
   }
-  // RTCSetMinDebugLogLevel(RTCLoggingSeverityVerbose);
-  VideoDecoderFactory* decoderFactory = [[VideoDecoderFactory alloc] init];
-  VideoEncoderFactory* encoderFactory = [[VideoEncoderFactory alloc] init];
-
-  VideoEncoderFactorySimulcast* simulcastFactory =
-      [[VideoEncoderFactorySimulcast alloc] initWithPrimary:encoderFactory fallback:encoderFactory];
-
-  _peerConnectionFactory = [[RTCPeerConnectionFactory alloc] initWithEncoderFactory:simulcastFactory
-                                                                     decoderFactory:decoderFactory];
 
   NSDictionary* fieldTrials = @{kRTCFieldTrialUseNWPathMonitor : kRTCFieldTrialEnabledValue};
   RTCInitFieldTrialDictionary(fieldTrials);
@@ -230,8 +221,55 @@ MotionDetection* motionDetection;
 #endif
 }
 
+- (void)initialize:(NSArray*)networkIgnoreMask {
+    // RTCSetMinDebugLogLevel(RTCLoggingSeverityVerbose);
+    if (!_peerConnectionFactory) {
+        VideoDecoderFactory* decoderFactory = [[VideoDecoderFactory alloc] init];
+        VideoEncoderFactory* encoderFactory = [[VideoEncoderFactory alloc] init];
+
+        VideoEncoderFactorySimulcast* simulcastFactory =
+            [[VideoEncoderFactorySimulcast alloc] initWithPrimary:encoderFactory fallback:encoderFactory];
+
+        _peerConnectionFactory = [[RTCPeerConnectionFactory alloc] initWithEncoderFactory:simulcastFactory
+                                                                           decoderFactory:decoderFactory];
+
+        RTCPeerConnectionFactoryOptions *options = [[RTCPeerConnectionFactoryOptions alloc] init];
+        for (NSString* adapter in networkIgnoreMask)
+        {
+            if ([@"adapterTypeEthernet" isEqualToString:adapter]) {
+                options.ignoreEthernetNetworkAdapter = YES;
+            } else if ([@"adapterTypeWifi" isEqualToString:adapter]) {
+                options.ignoreWiFiNetworkAdapter = YES;
+            } else if ([@"adapterTypeCellular" isEqualToString:adapter]) {
+                options.ignoreCellularNetworkAdapter = YES;
+            } else if ([@"adapterTypeVpn" isEqualToString:adapter]) {
+                options.ignoreVPNNetworkAdapter = YES;
+            } else if ([@"adapterTypeLoopback" isEqualToString:adapter]) {
+                options.ignoreLoopbackNetworkAdapter = YES;
+            } else if ([@"adapterTypeAny" isEqualToString:adapter]) {
+                options.ignoreEthernetNetworkAdapter = YES;
+                options.ignoreWiFiNetworkAdapter = YES;
+                options.ignoreCellularNetworkAdapter = YES;
+                options.ignoreVPNNetworkAdapter = YES;
+                options.ignoreLoopbackNetworkAdapter = YES;
+            }
+        }
+
+        [_peerConnectionFactory setOptions: options];
+    }
+}
+
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-  if ([@"createPeerConnection" isEqualToString:call.method]) {
+  if ([@"initialize" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSDictionary* options = argsMap[@"options"];
+    NSArray* networkIgnoreMask = [NSArray new];
+    if (options[@"networkIgnoreMask"] != nil) {
+      networkIgnoreMask = ((NSArray*)options[@"networkIgnoreMask"]);
+    }
+    [self initialize:networkIgnoreMask];
+    result(@"");
+  } else if ([@"createPeerConnection" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     NSDictionary* configuration = argsMap[@"configuration"];
     NSDictionary* constraints = argsMap[@"constraints"];
@@ -750,6 +788,24 @@ MotionDetection* motionDetection;
                                    details:nil]);
       }
     }
+  } else if ([@"mediaStreamTrackSetZoom" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSString* trackId = argsMap[@"trackId"];
+    double zoomLevel = [argsMap[@"zoomLevel"] doubleValue];
+    RTCMediaStreamTrack* track = self.localTracks[trackId];
+    if (track != nil && [track isKindOfClass:[RTCVideoTrack class]]) {
+      RTCVideoTrack* videoTrack = (RTCVideoTrack*)track;
+      [self mediaStreamTrackSetZoom:videoTrack zoomLevel:zoomLevel result:result];
+    } else {
+      if (track == nil) {
+        result([FlutterError errorWithCode:@"Track is nil" message:nil details:nil]);
+      } else {
+        result([FlutterError errorWithCode:[@"Track is class of "
+                                               stringByAppendingString:[[track class] description]]
+                                   message:nil
+                                   details:nil]);
+      }
+    }
   } else if ([@"mediaStreamTrackSwitchCamera" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     NSString* trackId = argsMap[@"trackId"];
@@ -801,6 +857,12 @@ MotionDetection* motionDetection;
   }
   else if ([@"enableSpeakerphoneButPreferBluetooth" isEqualToString:call.method]) {
     [AudioUtils setSpeakerphoneOnButPreferBluetooth];
+    result(nil);
+  }
+  else if([@"setAppleAudioConfiguration" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    NSDictionary* configuration = argsMap[@"configuration"];
+    [AudioUtils setAppleAudioConfiguration:configuration];
     result(nil);
   }
 #endif
